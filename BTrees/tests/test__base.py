@@ -151,72 +151,77 @@ class Test_BucketBase(unittest.TestCase):
 
     def test__range_defaults_empty(self):
         bucket = self._makeOne()
-        self.assertEqual(bucket._range(), (0, 0))
+        self.assertEqual(bucket._range(), (0, 0, 1))
 
     def test__range_defaults_filled(self):
         bucket = self._makeOne()
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(), (0, 5))
+        self.assertEqual(bucket._range(), (0, 5, 1))
 
     def test__range_defaults_exclude_min(self):
         bucket = self._makeOne()
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(excludemin=True), (1, 5))
+        self.assertEqual(bucket._range(excludemin=True), (1, 5, 1))
 
     def test__range_defaults_exclude_max(self):
         bucket = self._makeOne()
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(excludemax=True), (0, 4))
+        self.assertEqual(bucket._range(excludemax=True), (0, 4, 1))
+
+    def test__range_defaults_reverse(self):
+        bucket = self._makeOne()
+        bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
+        self.assertEqual(bucket._range(reverse=True), (4, -1, -1))
 
     def test__range_w_min_hit(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(min='bravo'), (1, 5))
+        self.assertEqual(bucket._range(min='bravo'), (1, 5, 1))
 
     def test__range_w_min_miss(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(min='candy'), (2, 5))
+        self.assertEqual(bucket._range(min='candy'), (2, 5, 1))
 
     def test__range_w_min_hit_w_exclude_min(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(min='bravo', excludemin=True), (2, 5))
+        self.assertEqual(bucket._range(min='bravo', excludemin=True), (2, 5, 1))
 
     def test__range_w_min_miss_w_exclude_min(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
         # 'excludemin' doesn't fire on miss
-        self.assertEqual(bucket._range(min='candy', excludemin=True), (2, 5))
+        self.assertEqual(bucket._range(min='candy', excludemin=True), (2, 5, 1))
 
     def test__range_w_max_hit(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(max='delta'), (0, 4))
+        self.assertEqual(bucket._range(max='delta'), (0, 4, 1))
 
     def test__range_w_max_miss(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(max='dandy'), (0, 3))
+        self.assertEqual(bucket._range(max='dandy'), (0, 3, 1))
 
     def test__range_w_max_hit_w_exclude_max(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
-        self.assertEqual(bucket._range(max='delta', excludemax=True), (0, 3))
+        self.assertEqual(bucket._range(max='delta', excludemax=True), (0, 3, 1))
 
     def test__range_w_max_miss_w_exclude_max(self):
         bucket = self._makeOne()
         bucket._to_key = lambda x: x
         bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
         # 'excludemax' doesn't fire on miss
-        self.assertEqual(bucket._range(max='dandy', excludemax=True), (0, 3))
+        self.assertEqual(bucket._range(max='dandy', excludemax=True), (0, 3, 1))
 
     def test_keys_defaults_empty(self):
         bucket = self._makeOne()
@@ -305,6 +310,11 @@ class Test_BucketBase(unittest.TestCase):
         bucket = self._makeOne()
         KEYS = bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
         self.assertEqual(list(bucket.iterkeys(excludemax=True)), KEYS[0: 4])
+
+    def test_iterkeys_defaults_reverse(self):
+        bucket = self._makeOne()
+        KEYS = bucket._keys = ['alpha', 'bravo', 'charlie', 'delta', 'echo']
+        self.assertEqual(list(bucket.iterkeys(reverse=True)), KEYS[::-1])
 
     def test_iterkeys_w_min_hit(self):
         bucket = self._makeOne()
@@ -628,6 +638,14 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(bucket.keys(min='b', excludemin=True,
                                      max='f', excludemax=True), ['c', 'd', 'e'])
 
+    def test_keys_filled_w_args_reverse(self):
+        bucket = self._makeOne()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+        self.assertEqual(bucket.keys(min='b', excludemin=True,
+                                     max='f', excludemax=True,
+                                     reverse=True), ['e', 'd', 'c'])
+
     def test_iterkeys_empty_no_args(self):
         bucket = self._makeOne()
         self.assertEqual(list(bucket.iterkeys()), [])
@@ -664,6 +682,14 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(bucket.values(min='b', excludemin=True,
                                        max='f', excludemax=True), [2, 3, 4])
 
+    def test_values_filled_w_args_reverse(self):
+        bucket = self._makeOne()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+        self.assertEqual(bucket.values(min='b', excludemin=True,
+                                       max='f', excludemax=True,
+                                       reverse=True), [4, 3, 2])
+
     def test_itervalues_empty_no_args(self):
         bucket = self._makeOne()
         self.assertEqual(list(bucket.itervalues()), [])
@@ -681,6 +707,15 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(list(bucket.itervalues(
                                        min='b', excludemin=True,
                                        max='f', excludemax=True)), [2, 3, 4])
+
+    def test_itervalues_filled_w_args_reverse(self):
+        bucket = self._makeOne()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+        self.assertEqual(list(bucket.itervalues(
+                                       min='b', excludemin=True,
+                                       max='f', excludemax=True,
+                                       reverse=True)), [4, 3, 2])
 
     def test_items_empty_no_args(self):
         bucket = self._makeOne()
@@ -704,6 +739,18 @@ class BucketTests(unittest.TestCase):
                                        max='f', excludemax=True),
                         EXPECTED[2:5])
 
+    def test_items_filled_w_args_reverse(self):
+        bucket = self._makeOne()
+        EXPECTED = []
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+            EXPECTED.append((c, i))
+        self.assertEqual(bucket.items(min='b', excludemin=True,
+                                      max='f', excludemax=True,
+                                      reverse=True),
+                         EXPECTED[4:1:-1])
+
+
     def test_iteritems_empty_no_args(self):
         bucket = self._makeOne()
         self.assertEqual(list(bucket.iteritems()), [])
@@ -725,6 +772,17 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(list(bucket.iteritems(min='b', excludemin=True,
                                                max='f', excludemax=True)),
                         EXPECTED[2:5])
+
+    def test_iteritems_filled_w_args_reverse(self):
+        bucket = self._makeOne()
+        EXPECTED = []
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+            EXPECTED.append((c, i))
+        self.assertEqual(list(bucket.iteritems(min='b', excludemin=True,
+                                               max='f', excludemax=True,
+                                               reverse=True)),
+                         EXPECTED[4:1:-1])
 
     def test___getstate___empty_no_next(self):
         bucket = self._makeOne()

@@ -159,7 +159,8 @@ class _BucketBase(_Base):
                 raise ValueError("no key satisfies the conditions")
 
     def _range(self, min=_marker, max=_marker,
-               excludemin=False, excludemax=False):
+               excludemin=False, excludemax=False,
+               reverse=False):
         if min is _marker or min is None:
             start = 0
             if excludemin:
@@ -185,11 +186,16 @@ class _BucketBase(_Base):
             else:
                 end = -end - 1
 
-        return start, end
+        if reverse:
+            start, end = end-1, start-1
+            step = -1
+        else:
+            step = 1
+        return start, end, step
 
     def keys(self, *args, **kw):
-        start, end = self._range(*args, **kw)
-        return self._keys[start:end]
+        start, end, step = self._range(*args, **kw)
+        return self._keys[start:end:step]
 
     def iterkeys(self, *args, **kw):
         if not (args or kw):
@@ -394,8 +400,8 @@ class Bucket(_BucketBase):
         return new_instance
 
     def values(self, *args, **kw):
-        start, end = self._range(*args, **kw)
-        return self._values[start:end]
+        start, end, step = self._range(*args, **kw)
+        return self._values[start:end:step]
 
     def itervalues(self, *args, **kw):
         values = self._values
