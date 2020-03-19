@@ -52,6 +52,7 @@ typedef struct
     int first;              /* Start offset in firstbucket    */
     int last;               /* End offset in lastbucket       */
     char kind;              /* 'k', 'v', 'i'                  */
+    int reverse;            /* wether to iterate backward     */
 } BTreeItems;
 
 #define ITEMS(O)((BTreeItems*)(O))
@@ -59,7 +60,8 @@ typedef struct
 static PyObject *
 newBTreeItems(char kind,
               Bucket *lowbucket, int lowoffset,
-              Bucket *highbucket, int highoffset);
+              Bucket *highbucket, int highoffset,
+              int reverse);
 
 static void
 BTreeItems_dealloc(BTreeItems *self)
@@ -116,6 +118,7 @@ BTreeItems_length_or_nonzero(BTreeItems *self, int nonzero)
 static Py_ssize_t
 BTreeItems_length(BTreeItems *self)
 {
+    printf("BTreeItems_length\n");
     return BTreeItems_length_or_nonzero(self, 0);
 }
 
@@ -136,6 +139,7 @@ BTreeItems_length(BTreeItems *self)
 static int
 BTreeItems_seek(BTreeItems *self, Py_ssize_t i)
 {
+    printf("BTreeItems_seek");
     int delta, pseudoindex, currentoffset;
     Bucket *b, *currentbucket;
     int error;
@@ -304,6 +308,7 @@ getBucketEntry(Bucket *b, int i, char kind)
 static PyObject *
 BTreeItems_item(BTreeItems *self, Py_ssize_t i)
 {
+    printf("BTreeItems_item\n");
     PyObject *result;
 
     if (BTreeItems_seek(self, i) < 0)
@@ -331,6 +336,7 @@ BTreeItems_item(BTreeItems *self, Py_ssize_t i)
 static PyObject *
 BTreeItems_slice(BTreeItems *self, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
+    printf("BTreeItems_slice\n");
     Bucket *lowbucket;
     Bucket *highbucket;
     int lowoffset;
@@ -405,12 +411,13 @@ BTreeItems_slice(BTreeItems *self, Py_ssize_t ilow, Py_ssize_t ihigh)
         highoffset = self->currentoffset;
     }
     return newBTreeItems(self->kind,
-                         lowbucket, lowoffset, highbucket, highoffset);
+                         lowbucket, lowoffset, highbucket, highoffset, 0);
 }
 
 static PyObject *
 BTreeItems_subscript(BTreeItems *self, PyObject* subscript)
 {
+    printf("BTreeItems_subscript\n");
     Py_ssize_t len = BTreeItems_length_or_nonzero(self, 0);
 
     if (PyIndex_Check(subscript))
@@ -527,8 +534,10 @@ static PyTypeObject BTreeItemsType = {
 static PyObject *
 newBTreeItems(char kind,
               Bucket *lowbucket, int lowoffset,
-              Bucket *highbucket, int highoffset)
+              Bucket *highbucket, int highoffset,
+              int reverse)
 {
+    printf("newBTreeItemos\n");
     BTreeItems *self;
 
     UNLESS (self = PyObject_NEW(BTreeItems, &BTreeItemsType))
@@ -537,6 +546,7 @@ newBTreeItems(char kind,
 
     self->first=lowoffset;
     self->last=highoffset;
+    self->reverse=reverse;
 
     if (! lowbucket || ! highbucket
         || (lowbucket == highbucket && lowoffset > highoffset))
@@ -555,8 +565,16 @@ newBTreeItems(char kind,
         self->currentbucket = lowbucket;
     }
 
-    self->currentoffset = lowoffset;
-    self->pseudoindex = 0;
+    if (reverse)
+    {
+        self->currentoffset = highoffset;
+        self->pseudoindex = highoffset-lowoffset;
+    }
+    else
+    {
+        self->currentoffset = lowoffset;
+        self->pseudoindex = 0;
+    }
 
     return OBJECT(self);
 }
@@ -564,6 +582,7 @@ newBTreeItems(char kind,
 static int
 nextBTreeItems(SetIteration *i)
 {
+    printf("nextBTreeItems %i\n", i->position);
     if (i->position >= 0)
     {
         if (i->position)
@@ -593,7 +612,10 @@ nextBTreeItems(SetIteration *i)
                         currentbucket->values[ITEMS(i->set)->currentoffset]);
             INCREF_VALUE(i->value);
 
-            i->position ++;
+            if (i->reverse)
+                i->position --;
+            else
+                i->position ++;
 
             PER_UNUSE(currentbucket);
         }
@@ -609,6 +631,7 @@ nextBTreeItems(SetIteration *i)
 static int
 nextTreeSetItems(SetIteration *i)
 {
+    printf("nextTreeSetItems %i\n", i->position);
     if (i->position >= 0)
     {
         if (i->position)
@@ -633,7 +656,10 @@ nextTreeSetItems(SetIteration *i)
             COPY_KEY(i->key, currentbucket->keys[ITEMS(i->set)->currentoffset]);
             INCREF_KEY(i->key);
 
-            i->position ++;
+            if (i->reverse)
+                i->position --;
+            else
+                i->position ++;
 
             PER_UNUSE(currentbucket);
         }
@@ -668,6 +694,7 @@ typedef struct
 static BTreeIter *
 BTreeIter_new(BTreeItems *pitems)
 {
+    printf("BTreeIter_new\n");
     BTreeIter *result;
 
     assert(pitems != NULL);
@@ -695,6 +722,7 @@ BTreeIter_dealloc(BTreeIter *bi)
 static PyObject *
 BTreeIter_next(BTreeIter *bi, PyObject *args)
 {
+    printf("BTreeIter_next\n");
     PyObject *result = NULL;        /* until proven innocent */
     BTreeItems *items = bi->pitems;
     int i = items->currentoffset;
@@ -704,7 +732,7 @@ BTreeIter_next(BTreeIter *bi, PyObject *args)
         return NULL;
 
     PER_USE_OR_RETURN(bucket, NULL);
-    if (i >= bucket->len)
+    if (i < 0 || i >= bucket->len)
     {
         /* We never leave this routine normally with i >= len:  somebody
             * else mutated the current bucket.
@@ -712,7 +740,10 @@ BTreeIter_next(BTreeIter *bi, PyObject *args)
         PyErr_SetString(PyExc_RuntimeError,
                     "the bucket being iterated changed size");
         /* Arrange for that this error is sticky too. */
-        items->currentoffset = INT_MAX;
+        if (items->reverse)
+            items->currentoffset = INT_MIN;
+        else
+            items->currentoffset = INT_MAX;
         goto Done;
     }
 
@@ -720,7 +751,8 @@ BTreeIter_next(BTreeIter *bi, PyObject *args)
     result = getBucketEntry(bucket, i, items->kind);
 
     /* Advance position for next call. */
-    if (bucket == items->lastbucket && i >= items->last)
+    if ((bucket == items->lastbucket && i >= items->last) ||
+        (bucket == items->firstbucket && i < items->first))
     {
         /* Next call should terminate the iteration. */
         Py_DECREF(items->currentbucket);
@@ -728,8 +760,12 @@ BTreeIter_next(BTreeIter *bi, PyObject *args)
     }
     else
     {
-        ++i;
-        if (i >= bucket->len)
+        if (items->reverse)
+            --i;
+        else
+            ++i;
+
+        if (i >= bucket->len || i < 0)
         {
             Py_XINCREF(bucket->next);
             items->currentbucket = bucket->next;

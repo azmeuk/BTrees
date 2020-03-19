@@ -1561,7 +1561,7 @@ static PyObject *
 buildBucketIter(Bucket *self, PyObject *args, PyObject *kw, char kind)
 {
     BTreeItems *items;
-    int lowoffset, highoffset, reverse;
+    int lowoffset, highoffset, reverse=0;
     BTreeIter *result = NULL;
 
     PER_USE_OR_RETURN(self, NULL);
@@ -1569,7 +1569,7 @@ buildBucketIter(Bucket *self, PyObject *args, PyObject *kw, char kind)
         goto Done;
 
     items = (BTreeItems *)newBTreeItems(kind, self, lowoffset,
-                                        self, highoffset);
+                                        self, highoffset, reverse);
     if (items == NULL)
         goto Done;
 
@@ -2028,7 +2028,10 @@ nextBucket(SetIteration *i)
           INCREF_KEY(i->key);
           COPY_VALUE(i->value, BUCKET(i->set)->values[i->position]);
           INCREF_VALUE(i->value);
-          i->position ++;
+          if (i->reverse)
+              i->position--;
+          else
+              i->position ++;
         }
         else
         {

@@ -390,7 +390,10 @@ nextSet(SetIteration *i)
         {
           COPY_KEY(i->key, BUCKET(i->set)->keys[i->position]);
           INCREF_KEY(i->key);
-          i->position ++;
+          if (i->reverse)
+              i->position --;
+          else
+              i->position ++;
         }
         else
         {

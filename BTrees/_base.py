@@ -194,8 +194,7 @@ class _BucketBase(_Base):
         return start, end, step
 
     def keys(self, *args, **kw):
-        start, end, step = self._range(*args, **kw)
-        return self._keys[start:end:step]
+        return list(self.iterkeys(*args, **kw))
 
     def iterkeys(self, *args, **kw):
         if not (args or kw):
@@ -400,18 +399,14 @@ class Bucket(_BucketBase):
         return new_instance
 
     def values(self, *args, **kw):
-        start, end, step = self._range(*args, **kw)
-        return self._values[start:end:step]
+        return list(self.itervalues(*args, **kw))
 
     def itervalues(self, *args, **kw):
         values = self._values
         return (values[i] for i in xrange(*self._range(*args, **kw)))
 
     def items(self, *args, **kw):
-        keys = self._keys
-        values = self._values
-        return [(keys[i], values[i])
-                    for i in xrange(*self._range(*args, **kw))]
+        return list(self.iteritems(*args, **kw))
 
     def iteritems(self, *args, **kw):
         keys = self._keys

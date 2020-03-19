@@ -392,6 +392,7 @@ class Base(SignedMixin):
         self.assertFalse(isinstance(NonSub(), type(t)))
 
 class MappingBase(Base): # pylint:disable=too-many-public-methods
+
     # Tests common to mappings (buckets, btrees)
     SUPPORTS_NEGATIVE_VALUES = True
 
@@ -831,6 +832,42 @@ class MappingBase(Base): # pylint:disable=too-many-public-methods
             self.assertEqual(list(t.iterkeys()), keys)
             self.assertEqual(list(t.itervalues()), list(t.values()))
             self.assertEqual(list(t.iteritems()), list(t.items()))
+
+    @uses_negative_keys_and_values
+    def testReversedIterators(self):
+        t = self._makeOne()
+
+        for keys in [], [-2], [1, 4], list(range(-170, 2000, 6)):
+            t.clear()
+            for k in keys:
+                val = -3 * k
+                t[k] = val
+
+            self.assertEqual(list(t), keys)
+
+            x = []
+            for k in t:
+                x.append(k)
+            self.assertEqual(x, keys)
+
+            it = iter(t)
+            self.assertTrue(it is iter(it))
+            x = []
+            try:
+                while 1:
+                    x.append(next(it))
+            except StopIteration:
+                pass
+            self.assertEqual(x, keys)
+
+            self.assertEqual(list(t.iterkeys(reverse=True)), list(reversed(keys)))
+            self.assertEqual(list(t.itervalues(reverse=True)), list(t.values(reverse=True)))
+            self.assertEqual(list(t.iteritems(reverse=True)), list(t.items(reverse=True)))
+
+            self.assertEqual(list(t.keys(reverse=True)), list(reversed(keys)))
+            self.assertEqual(list(t.values(reverse=True)), list(reversed(list(t.values()))))
+            self.assertEqual(list(t.items(reverse=True)), list(reversed(list(t.items()))))
+
 
     @uses_negative_keys_and_values
     def testRangedIterators(self): # pylint:disable=too-many-locals

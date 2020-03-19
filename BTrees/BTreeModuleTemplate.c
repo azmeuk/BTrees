@@ -385,6 +385,7 @@ typedef struct SetIteration_s
   KEY_TYPE key;     /* next() sets to next key */
   VALUE_TYPE value; /* next() may set to next value */
   int (*next)(struct SetIteration_s*);  /* function to get next key+value */
+  int reverse;      /* wether to iterate forward or backward */
 } SetIteration;
 
 /* Finish the set iteration protocol.  This MUST be called by everyone
