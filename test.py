@@ -1,0 +1,16 @@
+from BTrees.OOBTree import OOBTree
+
+a = OOBTree({i: i*11 for i in range(40)})
+print("### keys")
+c = a.keys()
+print()
+print("### to list")
+expected = list(reversed(list(c)))
+print()
+print("### keys reverse")
+b = a.keys(reverse=True)
+print()
+print("### to list")
+actual = list(b)
+print()
+assert expected == actual, "Expected {}, got {}".format(expected, actual)

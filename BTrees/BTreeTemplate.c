@@ -1835,7 +1835,7 @@ BTree_rangeSearch(BTree *self, PyObject *args, PyObject *kw, char type)
 
     PER_UNUSE(self);
 
-    result = newBTreeItems(type, lowbucket, lowoffset, highbucket, highoffset);
+    result = newBTreeItems(type, lowbucket, lowoffset, highbucket, highoffset, reverse);
     Py_DECREF(lowbucket);
     Py_DECREF(highbucket);
     return result;
@@ -1854,7 +1854,7 @@ empty_and_decref_buckets:
 
 empty:
     PER_UNUSE(self);
-    return newBTreeItems(type, 0, 0, 0, 0);
+    return newBTreeItems(type, 0, 0, 0, 0, 0);
 }
 
 /*

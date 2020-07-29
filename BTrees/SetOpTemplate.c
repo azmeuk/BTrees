@@ -76,9 +76,12 @@ initSetIteration(SetIteration *i, PyObject *s, int useValues)
   i->set = NULL;
   i->position = -1;     /* set to 0 only on normal return */
   i->usesValue = 0;     /* assume it's a set or that values aren't iterated */
+  i->reverse = 0;
 
+  printf("initsetiteration\n");
   if (PyObject_IsInstance(s, (PyObject *)&BucketType))
     {
+        printf("initset bucket\n");
       i->set = s;
       Py_INCREF(s);
 
@@ -98,6 +101,7 @@ initSetIteration(SetIteration *i, PyObject *s, int useValues)
     }
   else if (PyObject_IsInstance(s, (PyObject *)&BTreeType))
     {
+        printf("initset btree\n");
       i->set = BTree_rangeSearch(BTREE(s), NULL, NULL, 'i');
       UNLESS(i->set) return -1;
 
@@ -134,8 +138,11 @@ initSetIteration(SetIteration *i, PyObject *s, int useValues)
       return -1;
     }
 
-  i->position = 0;
-
+//  if (i->set->reverse)
+//      i->position = 2;
+//  else
+//      i->position = 0;
+//
   return 0;
 }
 
@@ -225,6 +232,7 @@ set_operation(PyObject *s1, PyObject *s2,
   SetIteration i1 = {0,0,0}, i2 = {0,0,0};
   int cmp, merge;
 
+  printf("b\n");
   if (initSetIteration(&i1, s1, usevalues1) < 0) goto err;
   if (initSetIteration(&i2, s2, usevalues2) < 0) goto err;
   merge = i1.usesValue | i2.usesValue;

@@ -833,6 +833,46 @@ class MappingBase(Base): # pylint:disable=too-many-public-methods
             self.assertEqual(list(t.iteritems()), list(t.items()))
 
     @uses_negative_keys_and_values
+    def testReverseIterators(self):
+        t = self._makeOne()
+
+        for keys in [], [-2], [1, 4], list(range(-170, 2000, 6)):
+            t.clear()
+            values = []
+            for k in keys:
+                value = -3 * k
+                t[k] = value
+                values.append(value)
+            items = list(zip(keys, values))
+
+            self.assertEqual(list(t), keys)
+            self.assertEqual(list(t.itervalues()), values)
+            self.assertEqual(list(t.iteritems()), items)
+
+            x = []
+            for k in t:
+                x.append(k)
+            self.assertEqual(x, keys)
+
+            it = iter(t)
+            self.assertTrue(it is iter(it))
+            x = []
+            try:
+                while 1:
+                    x.append(next(it))
+            except StopIteration:
+                pass
+            self.assertEqual(x, keys)
+
+            self.assertEqual(list(t.iterkeys(reverse=True)), list(reversed(keys)))
+            self.assertEqual(list(t.itervalues(reverse=True)), list(reversed(values)))
+            self.assertEqual(list(t.iteritems(reverse=True)), list(reversed(items)))
+
+            self.assertEqual(list(t.keys(reverse=True)), list(reversed(keys)))
+            self.assertEqual(list(t.values(reverse=True)), list(reversed(values)))
+            self.assertEqual(list(t.items(reverse=True)), list(reversed(items)))
+
+    @uses_negative_keys_and_values
     def testRangedIterators(self): # pylint:disable=too-many-locals
         t = self._makeOne()
 
