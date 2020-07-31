@@ -61,19 +61,17 @@ class DegenerateBTree(unittest.TestCase):
         from BTrees.IIBTree import IISet
         from BTrees.IIBTree import IITreeSet
         from BTrees.check import check
-        bucket11 = IISet([11])
-
-        bucket7 = IISet()
-        bucket7.__setstate__(((7,), bucket11))
-
-        bucket5 = IISet()
-        bucket5.__setstate__(((5,), bucket7))
-
-        bucket3 = IISet()
-        bucket3.__setstate__(((3,), bucket5))
-
         bucket1 = IISet()
+        bucket3 = IISet()
+        bucket5 = IISet()
+        bucket7 = IISet()
+        bucket11 = IISet()
+
         bucket1.__setstate__(((1,), bucket3))
+        bucket3.__setstate__(((3,), bucket5))
+        bucket5.__setstate__(((5,), bucket7))
+        bucket7.__setstate__(((7,), bucket11))
+        bucket11.__setstate__(((11,), None))
 
         # Build the deepest layers of indirection nodes.
         ts = IITreeSet

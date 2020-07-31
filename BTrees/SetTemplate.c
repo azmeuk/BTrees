@@ -148,7 +148,7 @@ _set_setstate(Bucket *self, PyObject *args)
 
     self->len=l;
 
-    if (next)
+    if (next && next != Py_None)
     {
         self->next=next;
         Py_INCREF(next);
