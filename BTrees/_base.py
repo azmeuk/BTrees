@@ -94,12 +94,14 @@ class _BucketBase(_Base):
 
     __slots__ = ('_keys',
                  '_next',
+                 '_prev',
                  '_to_key',
                 )
 
     def clear(self):
         self._keys = self._key_type()
         self._next = None
+        self._prev = None
 
     def __len__(self):
         return len(self._keys)
@@ -112,6 +114,8 @@ class _BucketBase(_Base):
         next = self._next
         if next is not None:
             self._next = next._next
+            if next._next is not None:
+                self._next._prev = self
 
     def _search(self, key):
         # Return non-negative index on success
@@ -389,7 +393,10 @@ class Bucket(_BucketBase):
         new_instance._values = self._values[index:]
         del self._keys[index:]
         del self._values[index:]
+        if self._next is not None:
+            self._next._prev = new_instance
         new_instance._next = self._next
+        new_instance._prev = self
         self._next = new_instance
         return new_instance
 
@@ -422,8 +429,12 @@ class Bucket(_BucketBase):
             data.append(values[i])
         data = tuple(data)
 
-        if self._next is not None:
+        if self._next is not None and self._prev is not None:
+            return data, self._next, self._prev
+        elif self._next is not None:
             return data, self._next
+        elif self._prev is not None:
+            return data, None, self._prev
         return (data, )
 
     def __setstate__(self, state):
@@ -431,10 +442,16 @@ class Bucket(_BucketBase):
             raise TypeError("tuple required for first state element")
 
         self.clear()
-        if len(state) == 2:
+        if len(state) == 3:
+            state, self._next, self._prev = state
+
+        elif len(state) == 2:
             state, self._next = state
+            if self._next and isinstance(self._next, type(self)):
+                self._next._prev = self
         else:
             self._next = None
+            self._prev = None
             state = state[0]
 
         keys = self._keys
@@ -610,7 +627,10 @@ class Set(_BucketBase):
             raise TypeError('tuple required for first state element')
 
         self.clear()
-        if len(state) == 2:
+        if len(state) == 3:
+            state, self._next, self._prev = state
+
+        elif len(state) == 2:
             state, self._next = state
         else:
             self._next = None

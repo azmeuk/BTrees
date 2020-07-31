@@ -621,6 +621,17 @@ bucket_split(Bucket *self, int index, Bucket *next)
     self->len = index;
 
     next->next = self->next;
+    next->prev = self;
+
+    if (self->next)
+    {
+        Py_INCREF(next);
+        self->next->prev = next;
+    }
+    else
+    {
+        Py_INCREF(self);
+    }
 
     Py_INCREF(next);
     self->next = next;
@@ -659,6 +670,11 @@ Bucket_deleteNextBucket(Bucket *self)
 
         Py_XINCREF(next);       /* it may be NULL, of course */
         self->next = next;
+        if (next)
+        {
+            Py_XINCREF(self);
+            next->prev = self;
+        }
         Py_DECREF(successor);
         if (PER_CHANGED(self) < 0)
             goto Done;
@@ -1105,6 +1121,11 @@ _bucket_clear(Bucket *self)
         Py_DECREF(self->next);
         self->next = NULL;
     }
+    if (self->prev)
+    {
+        Py_DECREF(self->prev);
+        self->prev = NULL;
+    }
 
     /* Silence compiler warning about unused variable len for the case
         when neither key nor value is an object, i.e. II. */
@@ -1266,8 +1287,12 @@ bucket_getstate(Bucket *self)
         }
     }
 
-    if (self->next)
+    if (self->prev && self->next)
+        state = Py_BuildValue("OOO", items, self->next, self->prev);
+    else if (self->next)
         state = Py_BuildValue("OO", items, self->next);
+    else if (self->prev)
+        state = Py_BuildValue("OOO", items, Py_None, self->prev);
     else
         state = Py_BuildValue("(O)", items);
     Py_DECREF(items);
@@ -1286,11 +1311,12 @@ _bucket_setstate(Bucket *self, PyObject *state)
 {
     PyObject *k, *v, *items;
     Bucket *next = NULL;
+    Bucket *prev = NULL;
     int i, l, len, copied=1;
     KEY_TYPE *keys;
     VALUE_TYPE *values;
 
-    if (!PyArg_ParseTuple(state, "O|O:__setstate__", &items, &next))
+    if (!PyArg_ParseTuple(state, "O|OO:__setstate__", &items, &next, &prev))
         return -1;
 
     if (!PyTuple_Check(items)) {
@@ -1313,6 +1339,11 @@ _bucket_setstate(Bucket *self, PyObject *state)
     if (self->next) {
         Py_DECREF(self->next);
         self->next = NULL;
+    }
+
+    if (self->prev) {
+        Py_DECREF(self->prev);
+        self->prev = NULL;
     }
 
     if (len > self->size) {
@@ -1348,6 +1379,11 @@ _bucket_setstate(Bucket *self, PyObject *state)
     if (next && next != Py_None) {
         self->next = next;
         Py_INCREF(next);
+    }
+
+    if (prev && prev != Py_None) {
+        self->prev = prev;
+        Py_INCREF(prev);
     }
 
     return 0;

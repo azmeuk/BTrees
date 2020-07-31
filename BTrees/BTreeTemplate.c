@@ -177,6 +177,11 @@ BTree_check_inner(BTree *self, Bucket *nextbucket)
                 bucketafter = BUCKET(self->data[i+1].child);
             CHECK(BUCKET(child)->next == bucketafter,
                     "Bucket next pointer is damaged");
+
+            if (i < self->len - 1)
+                CHECK(BUCKET(child)->next->prev == child,
+                      "Bucket chain is damaged");
+
             PER_ALLOW_DEACTIVATION(child);
             activated_child = NULL;
         }

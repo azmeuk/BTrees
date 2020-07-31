@@ -227,7 +227,7 @@ def crack_btree(t, is_mapping):
 def crack_bucket(b, is_mapping):
     state = b.__getstate__()
     assert isinstance(state, tuple)
-    assert 1 <= len(state) <= 2
+    assert 1 <= len(state) <= 3
     data = state[0]
     if not is_mapping:
         return data, []
