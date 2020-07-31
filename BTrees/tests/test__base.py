@@ -70,16 +70,21 @@ class Test_BucketBase(unittest.TestCase):
 
     def test__deleteNextBucket_one(self):
         bucket1 = self._makeOne()
-        bucket2 = bucket1._next = self._makeOne()
+        bucket2 = self._makeOne()
+        bucket1._next = bucket2
+        bucket2._prev = bucket1
         bucket1._deleteNextBucket() # no raise
         self.assertTrue(bucket1._next is None)
 
     def test__deleteNextBucket_two(self):
         bucket1 = self._makeOne()
-        bucket2 = bucket1._next = self._makeOne()
-        bucket3 = bucket2._next = self._makeOne()
+        bucket2 = self._makeOne()
+        bucket3 = self._makeOne()
+        bucket1._next = bucket2
+        bucket2._next = bucket3
         bucket1._deleteNextBucket() # no raise
         self.assertTrue(bucket1._next is bucket3)
+        self.assertTrue(bucket3._prev is bucket1)
 
     def test__search_empty(self):
         bucket = self._makeOne()
@@ -582,7 +587,9 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(len(new_b._keys), 0)
         self.assertEqual(len(new_b._values), 0)
         self.assertTrue(bucket._next is new_b)
+        self.assertTrue(new_b._prev is bucket)
         self.assertTrue(new_b._next is next_b)
+        self.assertTrue(next_b._prev is new_b)
 
     def test__split_filled_default_index(self):
         bucket = self._makeOne()
@@ -595,7 +602,9 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(list(new_b._keys), ['d', 'e', 'f'])
         self.assertEqual(list(new_b._values), [3, 4, 5])
         self.assertTrue(bucket._next is new_b)
+        self.assertTrue(new_b._prev is bucket)
         self.assertTrue(new_b._next is next_b)
+        self.assertTrue(next_b._prev is new_b)
 
     def test__split_filled_explicit_index(self):
         bucket = self._makeOne()
@@ -608,7 +617,9 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(list(new_b._keys), ['c', 'd', 'e', 'f'])
         self.assertEqual(list(new_b._values), [2, 3, 4, 5])
         self.assertTrue(bucket._next is new_b)
+        self.assertTrue(new_b._prev is bucket)
         self.assertTrue(new_b._next is next_b)
+        self.assertTrue(next_b._prev is new_b)
 
     def test_keys_empty_no_args(self):
         bucket = self._makeOne()
@@ -735,6 +746,11 @@ class BucketTests(unittest.TestCase):
         bucket._next = next_b = self._makeOne()
         self.assertEqual(bucket.__getstate__(), ((), next_b))
 
+    def test___getstate___empty_w_prev(self):
+        bucket = self._makeOne()
+        bucket._prev = prev_b = self._makeOne()
+        self.assertEqual(bucket.__getstate__(), ((), None, prev_b))
+
     def test___getstate___non_empty_no_next(self):
         bucket = self._makeOne()
         EXPECTED = ()
@@ -752,6 +768,25 @@ class BucketTests(unittest.TestCase):
             EXPECTED += (c, i)
         self.assertEqual(bucket.__getstate__(), (EXPECTED, next_b))
 
+    def test___getstate___non_empty_w_prev(self):
+        bucket = self._makeOne()
+        bucket._prev = prev_b = self._makeOne()
+        EXPECTED = ()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+            EXPECTED += (c, i)
+        self.assertEqual(bucket.__getstate__(), (EXPECTED, None, prev_b))
+
+    def test___getstate___non_empty_w_next_and_prev(self):
+        bucket = self._makeOne()
+        bucket._next = next_b = self._makeOne()
+        bucket._prev = prev_b = self._makeOne()
+        EXPECTED = ()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+            EXPECTED += (c, i)
+        self.assertEqual(bucket.__getstate__(), (EXPECTED, next_b, prev_b))
+
     def test___setstate___w_non_tuple(self):
         bucket = self._makeOne()
         self.assertRaises(TypeError, bucket.__setstate__, (None,))
@@ -765,6 +800,15 @@ class BucketTests(unittest.TestCase):
         self.assertEqual(len(bucket.keys()), 0)
         self.assertTrue(bucket._next is None)
 
+    def test___setstate___w_empty_no_prev(self):
+        bucket = self._makeOne()
+        bucket._prev = self._makeOne()
+        for i, c in enumerate('abcdef'):
+            bucket[c] = i
+        bucket.__setstate__(((),))
+        self.assertEqual(len(bucket.keys()), 0)
+        self.assertTrue(bucket._prev is None)
+
     def test___setstate___w_non_empty_w_next(self):
         bucket = self._makeOne()
         next_b = self._makeOne()
@@ -776,6 +820,33 @@ class BucketTests(unittest.TestCase):
         bucket.__setstate__((ITEMS, next_b))
         self.assertEqual(bucket.items(), EXPECTED)
         self.assertTrue(bucket._next is next_b)
+
+    def test___setstate___w_non_empty_w_prev(self):
+        bucket = self._makeOne()
+        prev_b = self._makeOne()
+        ITEMS = ()
+        EXPECTED = []
+        for i, c in enumerate('abcdef'):
+            ITEMS += (c, i)
+            EXPECTED.append((c, i))
+        bucket.__setstate__((ITEMS, None, prev_b))
+        self.assertEqual(bucket.items(), EXPECTED)
+        self.assertTrue(bucket._next is None)
+        self.assertTrue(bucket._prev is prev_b)
+
+    def test___setstate___w_non_empty_w_next_and_prev(self):
+        bucket = self._makeOne()
+        next_b = self._makeOne()
+        prev_b = self._makeOne()
+        ITEMS = ()
+        EXPECTED = []
+        for i, c in enumerate('abcdef'):
+            ITEMS += (c, i)
+            EXPECTED.append((c, i))
+        bucket.__setstate__((ITEMS, next_b, prev_b))
+        self.assertEqual(bucket.items(), EXPECTED)
+        self.assertTrue(bucket._next is next_b)
+        self.assertTrue(bucket._prev is prev_b)
 
     def test__p_resolveConflict_x_on_com_next_old_new_None(self):
         from ..Interfaces import BTreesConflictError

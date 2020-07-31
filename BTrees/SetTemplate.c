@@ -102,10 +102,11 @@ _set_setstate(Bucket *self, PyObject *args)
 {
     PyObject *k, *items;
     Bucket *next=0;
+    Bucket *prev=0;
     int i, l, copied=1;
     KEY_TYPE *keys;
 
-    UNLESS (PyArg_ParseTuple(args, "O|O", &items, &next))
+    UNLESS (PyArg_ParseTuple(args, "O|OO", &items, &next, &prev))
         return -1;
 
     if (!PyTuple_Check(items)) {
@@ -127,6 +128,12 @@ _set_setstate(Bucket *self, PyObject *args)
     {
         Py_DECREF(self->next);
         self->next=0;
+    }
+
+    if (self->prev)
+    {
+        Py_DECREF(self->prev);
+        self->prev=0;
     }
 
     if (l > self->size)
@@ -152,6 +159,12 @@ _set_setstate(Bucket *self, PyObject *args)
     {
         self->next=next;
         Py_INCREF(next);
+    }
+
+    if (prev && prev != Py_None)
+    {
+        self->prev=prev;
+        Py_INCREF(prev);
     }
 
     return 0;
