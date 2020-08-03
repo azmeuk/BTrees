@@ -163,7 +163,8 @@ class _BucketBase(_Base):
                 raise ValueError("no key satisfies the conditions")
 
     def _range(self, min=_marker, max=_marker,
-               excludemin=False, excludemax=False):
+               excludemin=False, excludemax=False,
+               reverse=False):
         if min is _marker or min is None:
             start = 0
             if excludemin:
@@ -189,11 +190,16 @@ class _BucketBase(_Base):
             else:
                 end = -end - 1
 
-        return start, end
+        if not reverse:
+            step = 1
+        else:
+            step = -1
+            start, end = end-1, start-1
+
+        return start, end, step
 
     def keys(self, *args, **kw):
-        start, end = self._range(*args, **kw)
-        return self._keys[start:end]
+        return list(self.iterkeys(*args, **kw))
 
     def iterkeys(self, *args, **kw):
         if not (args or kw):
@@ -401,18 +407,14 @@ class Bucket(_BucketBase):
         return new_instance
 
     def values(self, *args, **kw):
-        start, end = self._range(*args, **kw)
-        return self._values[start:end]
+        return list(self.itervalues(*args, **kw))
 
     def itervalues(self, *args, **kw):
         values = self._values
         return (values[i] for i in xrange(*self._range(*args, **kw)))
 
     def items(self, *args, **kw):
-        keys = self._keys
-        values = self._values
-        return [(keys[i], values[i])
-                    for i in xrange(*self._range(*args, **kw))]
+        return list(self.iteritems(*args, **kw))
 
     def iteritems(self, *args, **kw):
         keys = self._keys
@@ -813,6 +815,7 @@ class _Tree(_Base):
 
     __slots__ = ('_data',
                  '_firstbucket',
+                 '_lastbucket',
                 )
 
     def __new__(cls, *args):
@@ -822,6 +825,7 @@ class _Tree(_Base):
         # and _data and _firstbucket are never defined, unless we do it here.
         value._data = []
         value._firstbucket = None
+        value._lastbucket = None
         return value
 
     def setdefault(self, key, value):
@@ -856,6 +860,7 @@ class _Tree(_Base):
             # In the case of __init__, this was already set by __new__
             self._data = []
         self._firstbucket = None
+        self._lastbucket = None
 
     def __nonzero__(self):
         return bool(self._data)
@@ -916,23 +921,31 @@ class _Tree(_Base):
 
     def keys(self, min=_marker, max=_marker,
              excludemin=False, excludemax=False,
-             itertype='iterkeys'):
+             itertype='iterkeys', reverse=False):
         if not self._data:
             return ()
 
-        if min is not _marker and min is not None:
-            min = self._to_key(min)
-            bucket = self._findbucket(min)
+        if not reverse:
+            if min is not _marker and min is not None:
+                min = self._to_key(min)
+                bucket = self._findbucket(min)
+            else:
+                bucket = self._firstbucket
         else:
-            bucket = self._firstbucket
+            if max is not _marker and max is not None:
+                max = self._to_key(max)
+                bucket = self._findbucket(max)
+            else:
+                bucket = self._lastbucket
 
-        iterargs = min, max, excludemin, excludemax
+        iterargs = min, max, excludemin, excludemax, reverse
 
         return _TreeItems(bucket, itertype, iterargs)
 
     def iterkeys(self, min=_marker, max=_marker,
-                 excludemin=False, excludemax=False):
-        return iter(self.keys(min, max, excludemin, excludemax))
+                 excludemin=False, excludemax=False,
+                 reverse=False):
+        return iter(self.keys(min, max, excludemin, excludemax, reverse=reverse))
 
     def __iter__(self):
         return iter(self.keys())
@@ -974,6 +987,7 @@ class _Tree(_Base):
             index = 0
             child = self._bucket_type()
             self._firstbucket = child
+            self._lastbucket = child
             data.append(_TreeItem(None, child))
 
         result = child._set(key, value, ifunset)
@@ -1004,11 +1018,13 @@ class _Tree(_Base):
         self._data.insert(index+1, _TreeItem(new_child.minKey(), new_child))
         if len(self._data) >= self.max_internal_size * 2:
             self._split_root()
+        self._lastbucket = new_child
 
     def _split_root(self):
         child = type(self)()
         child._data = self._data
         child._firstbucket = self._firstbucket
+        child._lastbucket = self._lastbucket
         self._data = [_TreeItem(None, child)]
         self._grow(child, 0)
 
@@ -1266,6 +1282,7 @@ class _TreeItems(object):
         bucket = self.firstbucket
         itertype = self.itertype
         iterargs = self.iterargs
+        reverse = iterargs[4] if len(iterargs) >= 5 else False
         done = 0
         # Note that we don't mind if the first bucket yields no
         # results due to an idiosyncrasy in how range searches are done.
@@ -1275,7 +1292,11 @@ class _TreeItems(object):
                 done = 0
             if done:
                 return
-            bucket = bucket._next
+
+            if not reverse:
+                bucket = bucket._next
+            else:
+                bucket = bucket._prev
             done = 1
 
 
@@ -1308,20 +1329,24 @@ class Tree(_Tree):
         raise KeyError(key)
 
     def values(self, min=_marker, max=_marker,
-               excludemin=False, excludemax=False):
-        return self.keys(min, max, excludemin, excludemax, 'itervalues')
+               excludemin=False, excludemax=False,
+               reverse=False):
+        return self.keys(min, max, excludemin, excludemax, 'itervalues', reverse)
 
     def itervalues(self, min=_marker, max=_marker,
-                   excludemin=False, excludemax=False):
-        return iter(self.values(min, max, excludemin, excludemax))
+                   excludemin=False, excludemax=False,
+                   reverse=False):
+        return iter(self.values(min, max, excludemin, excludemax, reverse))
 
     def items(self, min=_marker, max=_marker,
-              excludemin=False, excludemax=False):
-        return self.keys(min, max, excludemin, excludemax, 'iteritems')
+              excludemin=False, excludemax=False,
+              reverse=False):
+        return self.keys(min, max, excludemin, excludemax, 'iteritems', reverse)
 
     def iteritems(self, min=_marker, max=_marker,
-                  excludemin=False, excludemax=False):
-        return iter(self.items(min, max, excludemin, excludemax))
+                  excludemin=False, excludemax=False,
+                  reverse=False):
+        return iter(self.items(min, max, excludemin, excludemax, reverse))
 
     def byValue(self, min):
         return reversed(

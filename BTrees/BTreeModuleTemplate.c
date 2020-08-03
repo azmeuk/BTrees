@@ -507,7 +507,7 @@ BTree_Realloc(void *p, size_t sz)
  */
 static char *search_keywords[] = {"min", "max",
                                   "excludemin", "excludemax",
-                                  0};
+                                  "reverse", 0};
 
 #include "BTreeItemsTemplate.c"
 #include "BucketTemplate.c"
