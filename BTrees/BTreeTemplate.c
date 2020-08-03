@@ -96,11 +96,14 @@ BTree_check_inner(BTree *self, Bucket *nextbucket)
     {
         CHECK(self->firstbucket == NULL,
             "Empty BTree has non-NULL firstbucket");
+        CHECK(self->lastbucket == NULL,
+            "Empty BTree has non-NULL lastbucket");
         result = 0;
         goto Done;
     }
     /* Non-empty BTree. */
     CHECK(self->firstbucket != NULL, "Non-empty BTree has NULL firstbucket");
+    CHECK(self->lastbucket != NULL, "Non-empty BTree has NULL lastbucket");
 
     /* Obscure:  The first bucket is pointed to at least by self->firstbucket
     * and data[0].child of whichever BTree node it's a child of.  However,
@@ -111,9 +114,13 @@ BTree_check_inner(BTree *self, Bucket *nextbucket)
 #ifdef PERSISTENT
     CHECK(Py_REFCNT(self->firstbucket) >= 1,
             "Non-empty BTree firstbucket has refcount < 1");
+    CHECK(Py_REFCNT(self->lastbucket) >= 1,
+            "Non-empty BTree lastbucket has refcount < 1");
 #else
     CHECK(Py_REFCNT(self->firstbucket) >= 2,
             "Non-empty BTree firstbucket has refcount < 2");
+    CHECK(Py_REFCNT(self->lastbucket) >= 2,
+            "Non-empty BTree lastbucket has refcount < 2");
 #endif
 
     for (i = 0; i < self->len; ++i)
@@ -133,6 +140,17 @@ BTree_check_inner(BTree *self, Bucket *nextbucket)
             "its first child's firstbucket");
         PER_ALLOW_DEACTIVATION(child);
         activated_child = NULL;
+
+        lastchild = self->data[0].child;
+        UNLESS (PER_USE(lastchild))
+            goto Done;
+        activated_lastchild = lastchild;
+        CHECK(self->lastbucket == BTREE(lastchild)->lastbucket,
+            "BTree has lastbucket different than "
+            "its last child's lastbucket");
+        PER_ALLOW_DEACTIVATION(lastchild);
+        activated_lastchild = NULL;
+
         for (i = 0; i < self->len; ++i)
         {
             child = self->data[i].child;
@@ -156,6 +174,9 @@ BTree_check_inner(BTree *self, Bucket *nextbucket)
     {
         CHECK(self->firstbucket == BUCKET(self->data[0].child),
             "Bottom-level BTree node has inconsistent firstbucket belief");
+        CHECK(self->lastbucket == BUCKET(self->data[self->len-1].child),
+            "Bottom-level BTree node has inconsistent lastbucket belief");
+
         for (i = 0; i < self->len; ++i)
         {
             child = self->data[i].child;
@@ -355,7 +376,7 @@ static int
 BTree_split(BTree *self, int index, BTree *next)
 {
     int next_size;
-    Sized *child;
+    Sized *firstchild;
 
     if (index < 0 || index >= self->len)
         index = self->len / 2;
@@ -2184,6 +2205,7 @@ BTree_iteritems(BTree *self, PyObject *args, PyObject *kw)
 
 static struct PyMemberDef BTree_members[] = {
     {"_firstbucket", T_OBJECT, offsetof(BTree, firstbucket), READONLY},
+    {"_lastbucket", T_OBJECT, offsetof(BTree, lastbucket), READONLY},
     {NULL}
 };
 
